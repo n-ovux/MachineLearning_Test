@@ -2,70 +2,56 @@
 #include <stdio.h>
 
 #include <gsl/gsl_blas.h>
+#include <gsl/gsl_cblas.h>
 #include <gsl/gsl_matrix_double.h>
 #include <gsl/gsl_vector_double.h>
 
-void printMatrix(const gsl_matrix *matrix) {
-  for (int i = 0; i < matrix->size1; i++) {
-    for (int j = 0; j < matrix->size2; j++) {
-      printf("%f, ", gsl_matrix_get(matrix, i, j));
-    }
-    printf("\n");
-  }
-}
-
-void printVector(const gsl_vector *vector) {
-  for (int i = 0; i < vector->size; i++) {
-    printf("%f\n", gsl_vector_get(vector, i));
-  }
-}
-
-gsl_matrix *createRandMatrix(int rows, int cols, int maxValue) {
-  gsl_matrix *matrix = gsl_matrix_alloc(rows, cols);
-  for (int i = 0; i < rows; i++) {
-    for (int j = 0; j < cols; j++) {
-      gsl_matrix_set(matrix, i, j, rand() % maxValue);
-    }
-  }
-  return matrix;
-}
-
-gsl_vector *createRandVector(int rows, int maxValue) {
-  gsl_vector *vector = gsl_vector_calloc(rows);
-  for (int i = 0; i < rows; i++) {
-    gsl_vector_set(vector, i, rand() % maxValue);
-  }
-  return vector;
-}
+#include "util.h"
 
 static inline double sigmoid(double x) { return 1 / (1 + exp(-x)); }
 
-void applyFunctionMatrix(gsl_matrix *matrix, double (*function)(double x)) {
-  for (int i = 0; i < matrix->size1; i++) {
-    for (int j = 0; j < matrix->size2; j++) {
-      gsl_matrix_set(matrix, i, j, function(gsl_matrix_get(matrix, i, j)));
-    }
-  }
-}
-
-void applyFunctionVector(gsl_vector *vector, double (*function)(double x)) {
-  for (int i = 0; i < vector->size; i++) {
-    gsl_vector_set(vector, i, function(gsl_vector_get(vector, i)));
-  }
-}
-
 int main(void) {
-  gsl_vector *input = createRandVector(3, 5);
-  gsl_matrix *weights = createRandMatrix(3, 3, 5);
-  gsl_vector *output = gsl_vector_calloc(3);
+  int architecture[] = {2, 3, 1};
+  int layerCount = sizeof(architecture) / sizeof(int);
+  gsl_vector *layers[layerCount];
+  gsl_matrix *weights[layerCount - 1];
+  for (int i = 0; i < layerCount; i++) {
+    layers[i] = gsl_vector_calloc(architecture[i]);
+  }
+  for (int i = 0; i < layerCount - 1; i++) {
+    weights[i] = createRandMatrix(architecture[i + 1], architecture[i]);
+  }
 
-  gsl_blas_dgemv(CblasNoTrans, 1.0, weights, input, 0.0, output);
-  printVector(output);
-  applyFunctionVector(output, &sigmoid);
-  printVector(output);
+  gsl_vector *input = gsl_vector_calloc(2);
+  gsl_vector_set(input, 0, 0.5);
+  gsl_vector_set(input, 1, 0.5);
+  gsl_vector_memcpy(layers[0], input);
 
-  gsl_vector_free(input);
-  gsl_vector_free(output);
-  gsl_matrix_free(weights);
+  gsl_vector *output = gsl_vector_calloc(1);
+  gsl_vector_set(output, 0, 0.25);
+
+  for (int i = 0; i < layerCount - 1; i++) {
+    gsl_blas_dgemv(CblasNoTrans, 1, weights[i], layers[i], 0, layers[i + 1]);
+    elementWiseFunctionVector(layers[i + 1], &sigmoid);
+  }
+
+  double error = 0.0;
+  for (int i = 0; i < architecture[layerCount - 1]; i++) {
+    error += pow(gsl_vector_get(output, i) - gsl_vector_get(layers[layerCount - 1], i), 2);
+  }
+  error /= 2.0;
+
+  printf("Input: \n");
+  printVector(layers[0]);
+  printf("Output: \n");
+  printVector(layers[layerCount - 1]);
+  printf("Error: %f\n", error);
+
+  for (int i = 0; i < layerCount; i++) {
+    gsl_vector_free(layers[i]);
+  }
+  for (int i = 0; i < layerCount - 1; i++) {
+    gsl_matrix_free(weights[i]);
+  }
   return 0;
 }
