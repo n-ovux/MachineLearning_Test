@@ -11,7 +11,7 @@
 
 static inline double sigmoid(double x) { return 1 / (1 + exp(-x)); }
 
-gsl_vector *forward(const int architecture[], int layerCount, gsl_vector *layers[], gsl_matrix *weights[]) {
+gsl_vector *forward(const int architecture[], int layerCount, gsl_vector *layers[], gsl_matrix *const weights[]) {
   for (int i = 0; i < layerCount - 1; i++) {
     gsl_blas_dgemv(CblasNoTrans, 1, weights[i], layers[i], 0, layers[i + 1]);
     elementWiseFunctionVector(layers[i + 1], &sigmoid);
@@ -30,40 +30,38 @@ double error(const gsl_vector *output, const gsl_vector *expectedOutput) {
 }
 
 int main(void) {
-  int architecture[] = {2, 3, 1};
-  int layerCount = sizeof(architecture) / sizeof(int);
+  const int architecture[] = {1, 3, 1};
+  const int layerCount = sizeof(architecture) / sizeof(int);
   gsl_vector *layers[layerCount];
   gsl_matrix *weights[layerCount - 1];
   gsl_matrix *weightsCopy[layerCount - 1];
   gsl_matrix *weightsPrime[layerCount - 1];
   for (int i = 0; i < layerCount; i++) {
-    layers[i] = gsl_vector_calloc(architecture[i]);
+    layers[i] = gsl_vector_alloc(architecture[i]);
   }
   for (int i = 0; i < layerCount - 1; i++) {
     weights[i] = createRandMatrix(architecture[i + 1], architecture[i]);
-    weightsPrime[i] = gsl_matrix_calloc(architecture[i + 1], architecture[i]);
-    weightsCopy[i] = gsl_matrix_calloc(architecture[i + 1], architecture[i]);
+    weightsPrime[i] = gsl_matrix_alloc(architecture[i + 1], architecture[i]);
+    weightsCopy[i] = gsl_matrix_alloc(architecture[i + 1], architecture[i]);
   }
 
-  int samples = 3;
-  gsl_matrix *inputData = gsl_matrix_calloc(samples, architecture[0]);
-  gsl_matrix *outputData = gsl_matrix_calloc(samples, architecture[layerCount - 1]);
-  double inputDataRaw[3][2] = {{0, 0}, {1, 0}, {1, 1}};
-  double outputDataRaw[3][1] = {{0}, {0}, {1}};
-  assert(sizeof(inputDataRaw[0]) / sizeof(double) == inputData->size2 && "Columns in input data dont match matrix");
-  assert(sizeof(inputDataRaw) / sizeof(inputDataRaw[0]) == inputData->size1 && "Rows in input data dont match matrix");
-  assert(sizeof(outputDataRaw[0]) / sizeof(double) == outputData->size2 && "Columns in input data dont match matrix");
-  assert(sizeof(outputDataRaw) / sizeof(outputDataRaw[0]) == outputData->size1 && "Rows in input data dont match matrix");
-  for (int row = 0; row < inputData->size1; row++) {
-    for (int col = 0; col < inputData->size2; col++) {
-      gsl_matrix_set(inputData, row, col, inputDataRaw[row][col]);
-    }
-  }
-  for (int row = 0; row < outputData->size1; row++) {
-    for (int col = 0; col < outputData->size2; col++) {
-      gsl_matrix_set(outputData, row, col, outputDataRaw[row][col]);
-    }
-  }
+  const int samples = 3;
+  // clang-format off
+  double inputDataRaw[][1] = {
+    {0.1}, 
+    {0.3}, 
+    {0.5}
+  };
+  double outputDataRaw[][1] = {
+    {0.3}, 
+    {0.5}, 
+    {0.7}
+  };
+  // clang-format on
+  gsl_matrix *inputData = createMatrix((double *)inputDataRaw, samples, architecture[0]);
+  gsl_matrix *outputData = createMatrix((double *)outputDataRaw, samples, architecture[layerCount - 1]);
+  assert(sizeof(inputDataRaw[0]) / sizeof(double) == inputData->size2 && "Amount of inputs on data does not match architecture");
+  assert(sizeof(outputDataRaw[0]) / sizeof(double) == outputData->size2 && "Amount of outputs on data does not match architecture");
 
   double h = 0.01;
   double learningRate = 1;
@@ -102,9 +100,8 @@ int main(void) {
   }
   finalError /= samples;
 
-  gsl_vector *testInputData = gsl_vector_calloc(architecture[0]);
-  gsl_vector_set(testInputData, 0, 1);
-  gsl_vector_set(testInputData, 1, 0);
+  double testInputDataRaw[] = {0.6};
+  gsl_vector *testInputData = createVector((double *)testInputDataRaw, architecture[0]);
   layers[0] = testInputData;
   gsl_vector *output = forward(architecture, layerCount, layers, weights);
 

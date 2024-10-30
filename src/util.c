@@ -1,4 +1,5 @@
 #include <gsl/gsl_matrix.h>
+#include <gsl/gsl_matrix_double.h>
 #include <gsl/gsl_vector.h>
 
 #include "util.h"
@@ -32,6 +33,23 @@ gsl_vector *createRandVector(int rows) {
   gsl_vector *vector = gsl_vector_calloc(rows);
   for (int i = 0; i < rows; i++) {
     gsl_vector_set(vector, i, (rand() % 100) / 100.0);
+  }
+  return vector;
+}
+
+gsl_matrix *createMatrix(double *data, int rows, int cols) {
+  gsl_matrix *matrix = gsl_matrix_alloc(rows, cols);
+  for (int row = 0; row < rows; row++) {
+    for (int col = 0; col < cols; col++) {
+      gsl_matrix_set(matrix, row, col, data[row + col * rows]);
+    }
+  }
+  return matrix;
+}
+gsl_vector *createVector(double *data, int rows) {
+  gsl_vector *vector = gsl_vector_alloc(rows);
+  for (int row = 0; row < rows; row++) {
+    gsl_vector_set(vector, row, data[row]);
   }
   return vector;
 }
