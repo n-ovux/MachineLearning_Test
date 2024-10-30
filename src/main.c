@@ -33,7 +33,7 @@ double error(const gsl_vector *output, const gsl_vector *expectedOutput) {
 
 int main(void) {
   const int architecture[] = {1, 2, 2, 1};
-  const int samples = 4;
+  const int samples = 6;
   // clang-format off
   const double inputDataRaw[][1] = {
     {0}, 
