@@ -131,6 +131,8 @@ int main(void) {
   }
   for (int i = 0; i < layerCount - 1; i++) {
     gsl_matrix_free(weights[i]);
+    gsl_matrix_free(weightsCopy[i]);
+    gsl_matrix_free(weightsPrime[i]);
   }
   return 0;
 }
