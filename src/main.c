@@ -1,11 +1,13 @@
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
+#include <time.h>
 
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_cblas.h>
 #include <gsl/gsl_matrix_double.h>
 #include <gsl/gsl_vector_double.h>
+#include <stdlib.h>
 
 #include "util.h"
 
@@ -30,7 +32,32 @@ double error(const gsl_vector *output, const gsl_vector *expectedOutput) {
 }
 
 int main(void) {
-  const int architecture[] = {1, 3, 1};
+  const int architecture[] = {1, 2, 2, 1};
+  const int samples = 4;
+  // clang-format off
+  const double inputDataRaw[][1] = {
+    {0}, 
+    {0.1}, 
+    {0.2}, 
+    {0.3},
+    {0.4}, 
+    {0.5}
+  };
+  const double outputDataRaw[][1] = {
+    {0}, 
+    {0.2}, 
+    {0.4}, 
+    {0.6},
+    {0.8}, 
+    {1.0}
+  };
+  // clang-format on
+  const double testInputDataRaw[] = {0.25};
+  const double step = 0.0001;
+  const double learningRate = 1;
+  const int epochs = 100000;
+
+  srand(time(NULL));
   const int layerCount = sizeof(architecture) / sizeof(int);
   gsl_vector *layers[layerCount];
   gsl_matrix *weights[layerCount - 1];
@@ -45,27 +72,11 @@ int main(void) {
     weightsCopy[i] = gsl_matrix_alloc(architecture[i + 1], architecture[i]);
   }
 
-  const int samples = 3;
-  // clang-format off
-  double inputDataRaw[][1] = {
-    {0.1}, 
-    {0.3}, 
-    {0.5}
-  };
-  double outputDataRaw[][1] = {
-    {0.3}, 
-    {0.5}, 
-    {0.7}
-  };
-  // clang-format on
   gsl_matrix *inputData = createMatrix((double *)inputDataRaw, samples, architecture[0]);
   gsl_matrix *outputData = createMatrix((double *)outputDataRaw, samples, architecture[layerCount - 1]);
   assert(sizeof(inputDataRaw[0]) / sizeof(double) == inputData->size2 && "Amount of inputs on data does not match architecture");
   assert(sizeof(outputDataRaw[0]) / sizeof(double) == outputData->size2 && "Amount of outputs on data does not match architecture");
 
-  double h = 0.01;
-  double learningRate = 1;
-  int epochs = 10000;
   for (int epoch = 0; epoch < epochs; epoch++) {
     gsl_vector *expectedOutput = gsl_vector_alloc_row_from_matrix(outputData, epoch % samples);
     layers[0] = gsl_vector_alloc_row_from_matrix(inputData, epoch % samples);
@@ -76,10 +87,10 @@ int main(void) {
           for (int i = 0; i < layerCount - 1; i++) {
             gsl_matrix_memcpy(weightsCopy[i], weights[i]);
           }
-          gsl_matrix_set(weightsCopy[layer], row, col, gsl_matrix_get(weightsCopy[layer], row, col) + h);
+          gsl_matrix_set(weightsCopy[layer], row, col, gsl_matrix_get(weightsCopy[layer], row, col) + step);
           gsl_vector *outputShifted = forward(architecture, layerCount, layers, weightsCopy);
           double dE = error(outputShifted, expectedOutput) - error(output, expectedOutput);
-          gsl_matrix_set(weightsPrime[layer], row, col, dE / h);
+          gsl_matrix_set(weightsPrime[layer], row, col, dE / step);
         }
       }
     }
@@ -100,7 +111,6 @@ int main(void) {
   }
   finalError /= samples;
 
-  double testInputDataRaw[] = {0.6};
   gsl_vector *testInputData = createVector((double *)testInputDataRaw, architecture[0]);
   layers[0] = testInputData;
   gsl_vector *output = forward(architecture, layerCount, layers, weights);
@@ -109,7 +119,7 @@ int main(void) {
   printf("Final Training Error: %f\n", finalError);
   printf("Epochs: %d\n", epochs);
   printf("Learning Rate: %f\n", learningRate);
-  printf("Step: %f\n", h);
+  printf("Step: %f\n", step);
   printf("--Test Input--\n");
   printf("Input: \n");
   printVector(testInputData);
