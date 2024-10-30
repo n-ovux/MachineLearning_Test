@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <math.h>
 #include <stdio.h>
 
@@ -44,17 +45,32 @@ int main(void) {
     weightsCopy[i] = gsl_matrix_calloc(architecture[i + 1], architecture[i]);
   }
 
-  gsl_vector *input = gsl_vector_calloc(2);
-  gsl_vector_set(input, 0, 0.5);
-  gsl_vector_set(input, 1, 0.5);
-  gsl_vector_memcpy(layers[0], input);
-  gsl_vector *expectedOutput = gsl_vector_calloc(1);
-  gsl_vector_set(expectedOutput, 0, 0.25);
+  int samples = 3;
+  gsl_matrix *inputData = gsl_matrix_calloc(samples, architecture[0]);
+  gsl_matrix *outputData = gsl_matrix_calloc(samples, architecture[layerCount - 1]);
+  double inputDataRaw[3][2] = {{0, 0}, {1, 0}, {1, 1}};
+  double outputDataRaw[3][1] = {{0}, {0}, {1}};
+  assert(sizeof(inputDataRaw[0]) / sizeof(double) == inputData->size2 && "Columns in input data dont match matrix");
+  assert(sizeof(inputDataRaw) / sizeof(inputDataRaw[0]) == inputData->size1 && "Rows in input data dont match matrix");
+  assert(sizeof(outputDataRaw[0]) / sizeof(double) == outputData->size2 && "Columns in input data dont match matrix");
+  assert(sizeof(outputDataRaw) / sizeof(outputDataRaw[0]) == outputData->size1 && "Rows in input data dont match matrix");
+  for (int row = 0; row < inputData->size1; row++) {
+    for (int col = 0; col < inputData->size2; col++) {
+      gsl_matrix_set(inputData, row, col, inputDataRaw[row][col]);
+    }
+  }
+  for (int row = 0; row < outputData->size1; row++) {
+    for (int col = 0; col < outputData->size2; col++) {
+      gsl_matrix_set(outputData, row, col, outputDataRaw[row][col]);
+    }
+  }
 
-  double h = 0.001;
+  double h = 0.01;
   double learningRate = 1;
-  int epochs = 100;
+  int epochs = 10000;
   for (int epoch = 0; epoch < epochs; epoch++) {
+    gsl_vector *expectedOutput = gsl_vector_alloc_row_from_matrix(outputData, epoch % samples);
+    layers[0] = gsl_vector_alloc_row_from_matrix(inputData, epoch % samples);
     gsl_vector *output = forward(architecture, layerCount, layers, weights);
     for (int layer = 0; layer < layerCount - 1; layer++) {
       for (int row = 0; row < weightsPrime[layer]->size1; row++) {
@@ -79,13 +95,29 @@ int main(void) {
     }
   }
 
+  double finalError = 0.0;
+  for (int i = 0; i < samples; i++) {
+    layers[0] = gsl_vector_alloc_row_from_matrix(inputData, i);
+    finalError += error(forward(architecture, layerCount, layers, weights), gsl_vector_alloc_row_from_matrix(outputData, i));
+  }
+  finalError /= samples;
+
+  gsl_vector *testInputData = gsl_vector_calloc(architecture[0]);
+  gsl_vector_set(testInputData, 0, 1);
+  gsl_vector_set(testInputData, 1, 0);
+  layers[0] = testInputData;
   gsl_vector *output = forward(architecture, layerCount, layers, weights);
-  double outputError = error(output, expectedOutput);
+
+  printf("--Test Training Results--\n");
+  printf("Final Training Error: %f\n", finalError);
+  printf("Epochs: %d\n", epochs);
+  printf("Learning Rate: %f\n", learningRate);
+  printf("Step: %f\n", h);
+  printf("--Test Input--\n");
   printf("Input: \n");
-  printVector(layers[0]);
+  printVector(testInputData);
   printf("Output: \n");
-  printVector(layers[layerCount - 1]);
-  printf("Error: %f\n", outputError);
+  printVector(output);
 
   for (int i = 0; i < layerCount; i++) {
     gsl_vector_free(layers[i]);
