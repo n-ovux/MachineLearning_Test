@@ -20,11 +20,11 @@ end
 
 sigmoid(x) = 1 / (1 + exp(-x))
 sigmoidPrime(x) = sigmoid(x) * (1 - sigmoid(x))
-sigmoidV(v) = map(x -> sigmoid(x), v)
-sigmoidPrimeV(v) = map(x -> sigmoidPrime(x), v)
+activate(x) = map(x -> sigmoid(x), x)
+activatePrime(x) = map(x -> sigmoidPrime(x), x)
 
 function (@main)(args)
-  architecture = [2, 2, 1]
+  architecture = [2, 3, 1]
   weights = Vector{Matrix{Float64}}(undef, length(architecture) - 1)
   weightsPrime = Vector{Matrix{Float64}}(undef, length(architecture) - 1)
   for index in 1:(length(architecture)-1)
@@ -38,31 +38,32 @@ function (@main)(args)
 
   data = [
     [[0.0, 0.0], [0.0]],
-    [[1.0, 0.0], [1.0]],
-    [[0.0, 1.0], [1.0]],
+    [[1.0, 0.0], [0.0]],
+    [[0.0, 1.0], [0.0]],
     [[1.0, 1.0], [1.0]],
   ]
-
   @assert length(data[1][1]) == architecture[1] "Number of data input(s) does not match architecture"
   @assert length(data[1][2]) == architecture[length(architecture)] "Number of data output(s) does not match architecture"
 
   epochs = 100000
   learningRate = 1
-  @time for epoch in 1:epochs
+  for epoch in 1:epochs
     # calculate weights prime
     currentData = data[(epoch%length(data)+1)][2]
     layers[1] = data[(epoch%length(data)+1)][1]
     forward(layers, weights)
-    weightsPrime[2] = (layers[3] - currentData) * sigmoidV(layers[2])'
-    weightsPrime[1] = diagm(sigmoidPrimeV(layers[2])) * weights[2]' * (layers[3] - currentData) * sigmoidV(layers[1])'
-
-    # this is for 4 layers
-    # weightsPrime[3] = (layers[4] - currentData) * sigmoidV(layers[3])'
-    # weightsPrime[2] = diagm(sigmoidPrimeV(layers[3])) * weights[3]' * (layers[4] - currentData) * sigmoidV(layers[2])'
-    # weightsPrime[1] = diagm(sigmoidPrimeV(layers[2])) * weights[2]' * diagm(sigmoidPrimeV(layers[3])) * weights[3]' * (layers[4] - currentData) * sigmoidV(layers[1])'
-
-    # desend
     for (weightLayer, weight) in enumerate(weights)
+      if length(layers) - weightLayer > 1
+        weightsPrime[weightLayer] = diagm(activatePrime(layers[weightLayer+1])) * weights[weightLayer+1]'
+        for k in weightLayer+2:length(layers)-1
+          weightsPrime[weightLayer] *= diagm(activatePrime(layers[k])) * weights[k]'
+        end
+        weightsPrime[weightLayer] *= (layers[length(layers)] - currentData) * activate(layers[weightLayer])'
+      else
+        weightsPrime[weightLayer] = (layers[length(layers)] - currentData) * activate(layers[weightLayer])'
+      end
+
+      # desend
       weights[weightLayer] -= learningRate * weightsPrime[weightLayer]
     end
   end
